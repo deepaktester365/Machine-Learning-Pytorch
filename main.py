@@ -22,7 +22,7 @@ class NN(nn.Module):
 
 
 # Set Device
-device = torch.device('cuda' if torch.cuda.is_available else "cpu")
+device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
 input_size = 784
@@ -56,3 +56,5 @@ for epoch in range(num_epochs):
         targets = targets.to(device=device)
 
         print(data.shape)
+
+# Check accuracy on training & test to see how good our model is
