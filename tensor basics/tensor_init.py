@@ -25,9 +25,10 @@ x = torch.eye(3, 3)
 x = torch.arange(start=0, end=5, step=1)
 x = torch.linspace(start=0.1, end=1, steps=10)
 x = torch.empty(size=(1, 5)).normal_(mean=0, std=1)
+x = torch.empty(size=(1, 5)).uniform_(0, 1)
 x = torch.diag(torch.ones(3))
 
-# How to initialize and convert tensors to toher types (int, float, double)
+# How to initialize and convert tensors to other types (int, float, double)
 
 tensor = torch.arange(4)
 print(tensor.bool())
