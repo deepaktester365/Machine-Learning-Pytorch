@@ -1,39 +1,58 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import torchvision
-from torch.utils.data import DataLoader
-from customDataset import CatsAndDogsDataset
+
 
 # Set Device
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-in_channel = 3
+in_channel = 1
 num_classes = 10
-learning_rate = 0.0001
-batch_size = 32
-num_epochs = 1
-
-# Load Data
-dataset = CatsAndDogsDataset(
-    csv_file="cats_dogs.csv", root_dir='cats_dogs_resized', transform=transforms.ToTensor())
+learning_rate = 0.001
+batch_size = 64
+num_epochs = 5
+load_model = True
 
 
-train_set, test_set = torch.utils.data.random_split(dataset, [20000, 5000])
+class Identity(nn.Module):
+    def __init__(self):
+        super(Identity, self).__init__()
 
-train_loader = DataLoader(dataset=train_set,
-                          batch_size=batch_size, shuffle=True)
-
-test_loader = DataLoader(dataset=test_set,
-                         batch_size=batch_size, shuffle=True)
+    def forward(self, x):
+        return x
 
 
 # Load pretained model and modify it
-model = torchvision.models.googlenet(pretrained=True)
+model = torchvision.models.vgg16(pretrained=True)
+
+for param in model.parameters():
+    param.requires_grad = False
+
+model.avgpool = Identity()
+model.classifier = nn.Sequential(
+    nn.Linear(512, 100), nn.ReLU(), nn.Linear(100, 10))
 model.to(device)
 
+
+# Load Data
+train_dataset = datasets.CIFAR10(
+    root="dataset/", train=True, transform=transforms.ToTensor(), download=True)
+train_loader = DataLoader(dataset=train_dataset,
+                          batch_size=batch_size, shuffle=True)
+
+test_dataset = datasets.CIFAR10(
+    root="dataset/", train=False, transform=transforms.ToTensor(), download=True)
+test_loader = DataLoader(dataset=test_dataset,
+                         batch_size=batch_size, shuffle=True)
+
+# # Initialize network
+# model = CNN().to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
@@ -45,6 +64,11 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 # Train Network
 for epoch in range(num_epochs):
     losses = []
+
+    # if epoch % 2 == 0:
+    #     checkpoint = {"state_dict": model.state_dict(
+    #     ), "optimizer": optimizer.state_dict()}
+    #     save_checkpoint(checkpoint)
 
     for batch_idx, (data, targets) in enumerate(train_loader):
         data = data.to(device=device)

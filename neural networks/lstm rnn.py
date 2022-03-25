@@ -1,59 +1,76 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision.transforms as transforms
-import torchvision
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from customDataset import CatsAndDogsDataset
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+
 
 # Set Device
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-in_channel = 3
+input_size = 28
+sequence_length = 28
+num_layers = 2
+hidden_size = 256
 num_classes = 10
-learning_rate = 0.0001
-batch_size = 32
-num_epochs = 1
+learning_rate = 0.001
+batch_size = 64
+num_epochs = 2
+
+
+# Create a RNN
+class RNN(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        super(RNN, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = nn.LSTM(input_size, hidden_size,
+                            num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size * sequence_length, num_classes)
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers, x.size(0),
+                         self.hidden_size).to(device)
+        c0 = torch.zeros(self.num_layers, x.size(0),
+                         self.hidden_size).to(device)
+        # Forward Propagation
+        out, _ = self.lstm(x, (h0, c0))
+        out = out.reshape(out.shape[0], -1)
+        out = self.fc(out)
+        return out
+
+
 
 # Load Data
-dataset = CatsAndDogsDataset(
-    csv_file="cats_dogs.csv", root_dir='cats_dogs_resized', transform=transforms.ToTensor())
-
-
-train_set, test_set = torch.utils.data.random_split(dataset, [20000, 5000])
-
-train_loader = DataLoader(dataset=train_set,
+train_dataset = datasets.MNIST(
+    root="dataset/", train=True, transform=transforms.ToTensor(), download=True)
+train_loader = DataLoader(dataset=train_dataset,
                           batch_size=batch_size, shuffle=True)
 
-test_loader = DataLoader(dataset=test_set,
+test_dataset = datasets.MNIST(
+    root="dataset/", train=False, transform=transforms.ToTensor(), download=True)
+test_loader = DataLoader(dataset=test_dataset,
                          batch_size=batch_size, shuffle=True)
 
-
-# Load pretained model and modify it
-model = torchvision.models.googlenet(pretrained=True)
-model.to(device)
-
+# Initialize network
+model = RNN(input_size, hidden_size, num_layers, num_classes).to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-# if load_model:
-#     load_checkpoint(torch.load("my_checkpoint.pth.tar"))
-
 # Train Network
 for epoch in range(num_epochs):
-    losses = []
-
     for batch_idx, (data, targets) in enumerate(train_loader):
-        data = data.to(device=device)
+        data = data.to(device=device).squeeze(1)
         targets = targets.to(device=device)
 
         # forward
         scores = model(data)
         loss = criterion(scores, targets)
-        losses.append(loss.item())
 
         # backward
         optimizer.zero_grad()
@@ -62,8 +79,6 @@ for epoch in range(num_epochs):
         # gradient descent or adam step
         optimizer.step()
 
-    mean_loss = sum(losses) / len(losses)
-    print(f'Loss at epoch {epoch} was {mean_loss:.5f}')
 # Check accuracy on training & test to see how good our model is
 
 
@@ -79,7 +94,7 @@ def check_accuracy(loader, model):
 
     with torch.no_grad():
         for x, y in loader:
-            x = x.to(device=device)
+            x = x.to(device=device).squeeze(1)
             y = y.to(device=device)
 
             scores = model(x)
